@@ -1,0 +1,71 @@
+name: micro-servizi
+
+x-app-environment: &app-environment
+  CC_DB_URL: "jdbc:mysql://mysql:3306/${MYSQL_DATABASE}"
+  CC_DB_USER: "${MYSQL_USER}"
+  CC_DB_PASSWORD: "${MYSQL_PASSWORD}"
+  CC_JWT_SECRET: "${CC_JWT_SECRET}"
+  CC_JWT_ISSUER: "${CC_JWT_ISSUER}"
+
+x-app-defaults: &app-defaults
+  depends_on:
+    mysql:
+      condition: service_healthy
+
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: "${MYSQL_DATABASE}"
+      MYSQL_USER: "${MYSQL_USER}"
+      MYSQL_PASSWORD: "${MYSQL_PASSWORD}"
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - type: bind
+        source: ../transaction-service/mysql/01-schema.sql
+        target: /docker-entrypoint-initdb.d/01-schema.sql
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          MYSQL_PWD="$$MYSQL_PASSWORD" mysql --protocol=TCP -h 127.0.0.1
+          -u "$$MYSQL_USER" "$$MYSQL_DATABASE"
+          -e 'SELECT 1 FROM accounttransaction LIMIT 0'
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  user-service:
+    <<: *app-defaults
+    build: .
+    environment:
+      <<: *app-environment
+      CC_ACCOUNT_URL: "http://account-service:8082"
+    ports:
+      - "127.0.0.1:8081:8081"
+
+  account-service:
+    <<: *app-defaults
+    build: ../account-service
+    environment:
+      <<: *app-environment
+      CC_USER_URL: "http://user-service:8081"
+      CC_TRANSACTION_URL: "http://transaction-service:8083"
+    ports:
+      - "127.0.0.1:8082:8082"
+
+  transaction-service:
+    <<: *app-defaults
+    build: ../transaction-service
+    environment:
+      <<: *app-environment
+      CC_ACCOUNT_URL: "http://account-service:8082"
+    ports:
+      - "127.0.0.1:8083:8083"
+
+volumes:
+  mysql_data:
