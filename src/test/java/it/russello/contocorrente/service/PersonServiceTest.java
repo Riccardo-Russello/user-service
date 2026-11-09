@@ -4,8 +4,12 @@ import it.russello.contocorrente.dto.PersonRequest;
 import it.russello.contocorrente.dto.PersonResponse;
 import it.russello.contocorrente.entity.Person;
 import it.russello.contocorrente.exception.ApiException;
-import it.russello.contocorrente.client.InternalClient;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.web.client.RestClient;
 import it.russello.contocorrente.repository.PersonRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,7 +36,7 @@ public class PersonServiceTest {
     @Mock
     private PersonRepository personRepository;
     @Mock
-    private InternalClient internalClient;
+    private RestClient restClient;
     @Mock
     private PasswordEncoder passwordEncoder;
     @InjectMocks
@@ -44,6 +48,17 @@ public class PersonServiceTest {
     @BeforeEach
     void configureClientUrl() {
         ReflectionTestUtils.setField(personService, "accountBaseUrl", ACCOUNT_URL);
+        var jwt = Jwt.withTokenValue("test-token")
+                .header("alg", "HS256")
+                .subject("test")
+                .build();
+        SecurityContextHolder.getContext().setAuthentication(
+                new JwtAuthenticationToken(jwt, java.util.List.of()));
+    }
+
+    @AfterEach
+    void clearAuthentication() {
+        SecurityContextHolder.clearContext();
     }
 
     private static Person person(Long id) {
@@ -84,7 +99,7 @@ public class PersonServiceTest {
         assertEquals(it.russello.contocorrente.entity.Role.user, submitted.getRole());
         verify(personRepository).existsByUsername("mario.rossi");
         verify(passwordEncoder).encode("passwmario");
-        verifyNoInteractions(internalClient);
+        verifyNoInteractions(restClient);
     }
 
     @Test
@@ -168,7 +183,7 @@ public class PersonServiceTest {
         assertEquals("Verdi", existing.getLastName());
         assertEquals(request.dateOfBirth(), existing.getDateOfBirth());
         verify(personRepository).save(existing);
-        verifyNoMoreInteractions(internalClient);
+        verifyNoMoreInteractions(restClient);
     }
 
     @Test
@@ -177,7 +192,7 @@ public class PersonServiceTest {
         ApiException exception = assertThrows(ApiException.class, () -> personService.update(1L, validUpdateRequest()));
         assertApiError(exception, HttpStatus.NOT_FOUND, "PERSON_NOT_FOUND");
         verify(personRepository, never()).save(any(Person.class));
-        verifyNoMoreInteractions(internalClient);
+        verifyNoMoreInteractions(restClient);
     }
 
     @Test
@@ -199,13 +214,13 @@ public class PersonServiceTest {
     void deletePersonWithNoAccount() {
         Person existing = person(1L);
         when(personRepository.findById(1L)).thenReturn(Optional.of(existing));
-        when(internalClient.check(ACCOUNT_URL, PERSON_ACCOUNTS, 1L)).thenReturn(false);
+        when(stubGet(ACCOUNT_URL + PERSON_ACCOUNTS, 1L).body(Boolean.class)).thenReturn(false);
 
         personService.delete(1L);
 
-        var order = inOrder(personRepository, internalClient);
+        var order = inOrder(personRepository, restClient);
         order.verify(personRepository).findById(1L);
-        order.verify(internalClient).check(ACCOUNT_URL, PERSON_ACCOUNTS, 1L);
+        order.verify(restClient).get();
         order.verify(personRepository).delete(existing);
         order.verify(personRepository).flush();
     }
@@ -214,7 +229,7 @@ public class PersonServiceTest {
     void deletePersonWithAccount() {
         Person existing = person(1L);
         when(personRepository.findById(1L)).thenReturn(Optional.of(existing));
-        when(internalClient.check(ACCOUNT_URL, PERSON_ACCOUNTS, 1L)).thenReturn(true);
+        when(stubGet(ACCOUNT_URL + PERSON_ACCOUNTS, 1L).body(Boolean.class)).thenReturn(true);
 
         ApiException exception = assertThrows(ApiException.class, () -> personService.delete(1L));
 
@@ -231,8 +246,23 @@ public class PersonServiceTest {
 
         assertApiError(exception, HttpStatus.NOT_FOUND, "PERSON_NOT_FOUND");
 
-        verifyNoMoreInteractions(internalClient);
+        verifyNoMoreInteractions(restClient);
         verify(personRepository, never()).delete(any(Person.class));
         verify(personRepository, never()).flush();
+    }
+
+    private RestClient.ResponseSpec stubGet(String url, Long id) {
+        RestClient.RequestHeadersUriSpec<?> uriSpec =
+                mock(RestClient.RequestHeadersUriSpec.class);
+        RestClient.RequestHeadersSpec<?> request =
+                mock(RestClient.RequestHeadersSpec.class);
+        RestClient.ResponseSpec response = mock(RestClient.ResponseSpec.class);
+
+        doReturn(uriSpec).when(restClient).get();
+        doReturn(request).when(uriSpec).uri(url, id);
+        doReturn(request).when(request).headers(any());
+        when(request.retrieve()).thenReturn(response);
+
+        return response;
     }
 }

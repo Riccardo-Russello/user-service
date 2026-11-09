@@ -16,6 +16,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.client.RestClient;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -52,6 +53,8 @@ public class PersonControllerTest {
     private PersonService personService;
     @MockitoBean
     private AuthService authService;
+    @MockitoBean
+    private RestClient restClient;
 
     private static PersonRequest request() {
         return new PersonRequest("Mario", "Rossi", BIRTH_DATE, "mario.rossi", "passwmario");
