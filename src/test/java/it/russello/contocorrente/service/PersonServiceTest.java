@@ -23,6 +23,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.List;
 import java.util.Optional;
 
@@ -43,7 +44,7 @@ public class PersonServiceTest {
     private PersonService personService;
 
     private static final String ACCOUNT_URL = "http://account.test";
-    private static final String PERSON_ACCOUNTS = "/internal/accounts/by-person/{id}/exists";
+    private static final String PERSON_ACCOUNTS = "/api/account?personId={id}&size=1";
 
     @BeforeEach
     void configureClientUrl() {
@@ -214,7 +215,7 @@ public class PersonServiceTest {
     void deletePersonWithNoAccount() {
         Person existing = person(1L);
         when(personRepository.findById(1L)).thenReturn(Optional.of(existing));
-        when(stubGet(ACCOUNT_URL + PERSON_ACCOUNTS, 1L).body(Boolean.class)).thenReturn(false);
+        when(stubGet(ACCOUNT_URL + PERSON_ACCOUNTS, 1L).body(Map.class)).thenReturn(Map.of("totalElements", 0));
 
         personService.delete(1L);
 
@@ -229,7 +230,7 @@ public class PersonServiceTest {
     void deletePersonWithAccount() {
         Person existing = person(1L);
         when(personRepository.findById(1L)).thenReturn(Optional.of(existing));
-        when(stubGet(ACCOUNT_URL + PERSON_ACCOUNTS, 1L).body(Boolean.class)).thenReturn(true);
+        when(stubGet(ACCOUNT_URL + PERSON_ACCOUNTS, 1L).body(Map.class)).thenReturn(Map.of("totalElements", 1));
 
         ApiException exception = assertThrows(ApiException.class, () -> personService.delete(1L));
 

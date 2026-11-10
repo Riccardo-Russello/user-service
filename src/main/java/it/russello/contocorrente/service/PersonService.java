@@ -21,6 +21,8 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClient;
 
+import java.util.Map;
+
 @Service
 @RequiredArgsConstructor
 public class PersonService {
@@ -89,7 +91,7 @@ public class PersonService {
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "PERSON_NOT_FOUND", "Persona non trovata"));
     }
 
-    private boolean check(String url, Long id) {
+    private boolean hasAccounts(Long id) {
         var authentication = SecurityContextHolder.getContext().getAuthentication();
         if (!(authentication instanceof JwtAuthenticationToken jwt)
                 || !jwt.isAuthenticated()) {
@@ -98,13 +100,13 @@ public class PersonService {
         }
 
         try {
-            Boolean result = restClient.get()
-                    .uri(url, id)
+            Map<?, ?> page = restClient.get()
+                    .uri(accountBaseUrl + "/api/account?personId={id}&size=1", id)
                     .headers(headers -> headers.setBearerAuth(jwt.getToken().getTokenValue()))
                     .retrieve()
-                    .body(Boolean.class);
-            if (result != null) {
-                return result;
+                    .body(Map.class);
+            if (page != null && page.get("totalElements") instanceof Number total) {
+                return total.longValue() > 0;
             }
         }catch (RestClientException ex) {
             throw upstreamUnavailable();
@@ -118,9 +120,5 @@ public class PersonService {
                 HttpStatus.SERVICE_UNAVAILABLE,
                 "UPSTREAM_UNAVAILABLE",
                 "Servizio remoto non disponibile");
-    }
-
-    private boolean hasAccounts(Long id) {
-        return check(accountBaseUrl + "/internal/accounts/by-person/{id}/exists", id);
     }
 }

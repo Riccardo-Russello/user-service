@@ -21,6 +21,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Map;
 
 import static it.russello.contocorrente.support.TestJwt.admin;
 import static org.junit.jupiter.api.Assertions.*;
@@ -189,7 +190,7 @@ public class PersonControllerIT {
         entityManager.clear();
         long counterBefore = personRepository.count();
 
-        when(stubGet("http://account.test/internal/accounts/by-person/{id}/exists", id).body(Boolean.class)).thenReturn(false);
+        when(stubGet("http://account.test/api/account?personId={id}&size=1", id).body(Map.class)).thenReturn(Map.of("totalElements", 0));
 
         mockMvc.perform(delete("/api/person/{id}", id).with(admin(1L)))
                 .andExpect(status().isNoContent())
@@ -232,7 +233,7 @@ public class PersonControllerIT {
         person.setUsername("delete.person");
         person.setPassword("fixture-password");
         personRepository.saveAndFlush(person);
-        when(stubGet("http://account.test" + "/internal/accounts/by-person/{id}/exists", person.getId()).body(Boolean.class)).thenReturn(true);
+        when(stubGet("http://account.test/api/account?personId={id}&size=1", person.getId()).body(Map.class)).thenReturn(Map.of("totalElements", 1));
         mockMvc.perform(delete("/api/person/{id}", person.getId())
                         .with(admin(person.getId())))
                 .andExpect(status().isConflict())
