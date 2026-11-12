@@ -1,0 +1,85 @@
+name: micro-servizi
+
+x-app-environment: &app-environment
+  SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/${MYSQL_DATABASE}"
+  SPRING_DATASOURCE_USERNAME: "${MYSQL_USER}"
+  SECURITY_JWT_ISSUER: "${CC_JWT_ISSUER}"
+  SPRING_CONFIG_IMPORT: "configtree:/run/secrets/"
+
+x-app-defaults: &app-defaults
+  secrets:
+    - source: db_password
+      target: spring.datasource.password
+    - source: jwt_secret
+      target: security.jwt.secret
+  depends_on:
+    mysql:
+      condition: service_healthy
+
+services:
+  mysql:
+    image: mysql:8.4
+    ports:
+      - "127.0.0.1:3307:3306"
+    environment:
+      MYSQL_DATABASE: "${MYSQL_DATABASE}"
+      MYSQL_USER: "${MYSQL_USER}"
+      MYSQL_PASSWORD_FILE: /run/secrets/db_password
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/db_root_password
+    secrets:
+      - db_password
+      - db_root_password
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/01-person.sql:/docker-entrypoint-initdb.d/01-person.sql:ro
+      - ../account-service/mysql/02-account.sql:/docker-entrypoint-initdb.d/02-account.sql:ro
+      - ../transaction-service/mysql/03-accounttransaction.sql:/docker-entrypoint-initdb.d/03-accounttransaction.sql:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          MYSQL_PWD="$$(cat /run/secrets/db_password)" mysql --protocol=TCP -h 127.0.0.1
+          -u "$$MYSQL_USER" "$$MYSQL_DATABASE"
+          -e 'SELECT 1 FROM accounttransaction LIMIT 0'
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  user-service:
+    <<: *app-defaults
+    build: .
+    environment:
+      <<: *app-environment
+      CLIENTS_ACCOUNT_BASEURL: "http://account-service:8082"
+    ports:
+      - "127.0.0.1:8081:8081"
+
+  account-service:
+    <<: *app-defaults
+    build: ../account-service
+    environment:
+      <<: *app-environment
+      CLIENTS_USER_BASEURL: "http://user-service:8081"
+      CLIENTS_TRANSACTION_BASEURL: "http://transaction-service:8083"
+    ports:
+      - "127.0.0.1:8082:8082"
+
+  transaction-service:
+    <<: *app-defaults
+    build: ../transaction-service
+    environment:
+      <<: *app-environment
+      CLIENTS_ACCOUNT_BASEURL: "http://account-service:8082"
+    ports:
+      - "127.0.0.1:8083:8083"
+
+volumes:
+  mysql_data:
+
+secrets:
+  db_password:
+    file: ./.secrets/db_password
+  db_root_password:
+    file: ./.secrets/db_root_password
+  jwt_secret:
+    file: ./.secrets/jwt_secret
