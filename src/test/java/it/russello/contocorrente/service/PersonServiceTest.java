@@ -1,9 +1,12 @@
 package it.russello.contocorrente.service;
 
+import it.russello.contocorrente.dto.AccountResponse;
+import it.russello.contocorrente.dto.PageResponse;
 import it.russello.contocorrente.dto.PersonRequest;
 import it.russello.contocorrente.dto.PersonResponse;
 import it.russello.contocorrente.entity.Person;
 import it.russello.contocorrente.exception.ApiException;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -23,7 +26,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
-import java.util.Map;
 import java.util.List;
 import java.util.Optional;
 
@@ -215,7 +217,9 @@ public class PersonServiceTest {
     void deletePersonWithNoAccount() {
         Person existing = person(1L);
         when(personRepository.findById(1L)).thenReturn(Optional.of(existing));
-        when(stubGet(ACCOUNT_URL + PERSON_ACCOUNTS, 1L).body(Map.class)).thenReturn(Map.of("totalElements", 0));
+        when(stubGet(ACCOUNT_URL + PERSON_ACCOUNTS, 1L)
+                .body(new ParameterizedTypeReference<PageResponse<AccountResponse>>() {}))
+                .thenReturn(new PageResponse<>(List.of(), 0, 1, 0L, 0));
 
         personService.delete(1L);
 
@@ -230,7 +234,9 @@ public class PersonServiceTest {
     void deletePersonWithAccount() {
         Person existing = person(1L);
         when(personRepository.findById(1L)).thenReturn(Optional.of(existing));
-        when(stubGet(ACCOUNT_URL + PERSON_ACCOUNTS, 1L).body(Map.class)).thenReturn(Map.of("totalElements", 1));
+        when(stubGet(ACCOUNT_URL + PERSON_ACCOUNTS, 1L)
+                .body(new ParameterizedTypeReference<PageResponse<AccountResponse>>() {}))
+                .thenReturn(new PageResponse<>(List.of(), 0, 1, 1L, 1));
 
         ApiException exception = assertThrows(ApiException.class, () -> personService.delete(1L));
 

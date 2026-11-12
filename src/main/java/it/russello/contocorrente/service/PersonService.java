@@ -21,7 +21,9 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClient;
 
-import java.util.Map;
+import it.russello.contocorrente.dto.AccountResponse;
+import it.russello.contocorrente.dto.PageResponse;
+import org.springframework.core.ParameterizedTypeReference;
 
 @Service
 @RequiredArgsConstructor
@@ -100,13 +102,14 @@ public class PersonService {
         }
 
         try {
-            Map<?, ?> page = restClient.get()
+            PageResponse<AccountResponse> page = restClient.get()
                     .uri(accountBaseUrl + "/api/account?personId={id}&size=1", id)
                     .headers(headers -> headers.setBearerAuth(jwt.getToken().getTokenValue()))
                     .retrieve()
-                    .body(Map.class);
-            if (page != null && page.get("totalElements") instanceof Number total) {
-                return total.longValue() > 0;
+                    .body(new ParameterizedTypeReference<PageResponse<AccountResponse>>() {});
+
+            if (page != null && page.totalElements() != null) {
+                return page.totalElements() > 0;
             }
         }catch (RestClientException ex) {
             throw upstreamUnavailable();

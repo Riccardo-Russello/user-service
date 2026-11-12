@@ -1,5 +1,6 @@
 package it.russello.contocorrente.controller;
 
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.client.RestClient;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import static org.mockito.ArgumentMatchers.any;
@@ -7,6 +8,8 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import it.russello.contocorrente.dto.AccountResponse;
+import it.russello.contocorrente.dto.PageResponse;
 import it.russello.contocorrente.entity.Person;
 import it.russello.contocorrente.repository.PersonRepository;
 import jakarta.persistence.EntityManager;
@@ -21,7 +24,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.Map;
+import java.util.List;
 
 import static it.russello.contocorrente.support.TestJwt.admin;
 import static org.junit.jupiter.api.Assertions.*;
@@ -190,7 +193,9 @@ public class PersonControllerIT {
         entityManager.clear();
         long counterBefore = personRepository.count();
 
-        when(stubGet("http://account.test/api/account?personId={id}&size=1", id).body(Map.class)).thenReturn(Map.of("totalElements", 0));
+        when(stubGet("http://account.test/api/account?personId={id}&size=1", id)
+                .body(new ParameterizedTypeReference<PageResponse<AccountResponse>>() {}))
+                .thenReturn(new PageResponse<>(List.of(), 0, 1, 0L, 0));
 
         mockMvc.perform(delete("/api/person/{id}", id).with(admin(1L)))
                 .andExpect(status().isNoContent())
@@ -233,7 +238,9 @@ public class PersonControllerIT {
         person.setUsername("delete.person");
         person.setPassword("fixture-password");
         personRepository.saveAndFlush(person);
-        when(stubGet("http://account.test/api/account?personId={id}&size=1", person.getId()).body(Map.class)).thenReturn(Map.of("totalElements", 1));
+        when(stubGet("http://account.test/api/account?personId={id}&size=1", person.getId())
+                .body(new ParameterizedTypeReference<PageResponse<AccountResponse>>() {}))
+                .thenReturn(new PageResponse<>(List.of(), 0, 1, 1L, 1));
         mockMvc.perform(delete("/api/person/{id}", person.getId())
                         .with(admin(person.getId())))
                 .andExpect(status().isConflict())
