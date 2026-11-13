@@ -1,5 +1,7 @@
 package it.russello.contocorrente.service;
 
+import it.russello.contocorrente.client.AccountClient;
+import it.russello.contocorrente.security.AccountSecurity;
 import it.russello.contocorrente.dto.AccountResponse;
 import it.russello.contocorrente.dto.PageResponse;
 import it.russello.contocorrente.dto.PersonRequest;
@@ -17,7 +19,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.*;
@@ -42,7 +43,10 @@ public class PersonServiceTest {
     private RestClient restClient;
     @Mock
     private PasswordEncoder passwordEncoder;
-    @InjectMocks
+    @Mock
+    private AccountSecurity accountSecurity;
+
+
     private PersonService personService;
 
     private static final String ACCOUNT_URL = "http://account.test";
@@ -50,7 +54,9 @@ public class PersonServiceTest {
 
     @BeforeEach
     void configureClientUrl() {
-        ReflectionTestUtils.setField(personService, "accountBaseUrl", ACCOUNT_URL);
+        var accountClient = new AccountClient(restClient);
+        ReflectionTestUtils.setField(accountClient, "accountBaseUrl", ACCOUNT_URL);
+        personService = new PersonService(personRepository, passwordEncoder, accountSecurity, accountClient);
         var jwt = Jwt.withTokenValue("test-token")
                 .header("alg", "HS256")
                 .subject("test")

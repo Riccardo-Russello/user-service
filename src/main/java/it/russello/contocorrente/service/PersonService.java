@@ -1,5 +1,6 @@
 package it.russello.contocorrente.service;
 
+import it.russello.contocorrente.client.AccountClient;
 import it.russello.contocorrente.dto.PersonRequest;
 import it.russello.contocorrente.dto.PersonResponse;
 import it.russello.contocorrente.entity.Person;
@@ -7,7 +8,6 @@ import it.russello.contocorrente.exception.ApiException;
 import it.russello.contocorrente.repository.PersonRepository;
 import it.russello.contocorrente.security.AccountSecurity;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -15,15 +15,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestClient;
-
-import it.russello.contocorrente.dto.AccountResponse;
-import it.russello.contocorrente.dto.PageResponse;
-import org.springframework.core.ParameterizedTypeReference;
 
 @Service
 @RequiredArgsConstructor
@@ -31,10 +22,8 @@ public class PersonService {
     private final PersonRepository personRepository;
     private final PasswordEncoder passwordEncoder;
     private final AccountSecurity accountSecurity;
-    private final RestClient restClient;
+    private final AccountClient accountClient;
 
-    @Value("${clients.account.base-url}")
-    private String accountBaseUrl;
 
     @PreAuthorize("isAnonymous() or hasRole('admin')")
     public PersonResponse create(PersonRequest request) {
@@ -80,7 +69,7 @@ public class PersonService {
     @PreAuthorize("hasRole('admin')")
     public void delete(Long id) {
         Person person = requirePerson(id);
-        if(hasAccounts(id)) {
+        if(accountClient.hasAccounts(id)) {
             throw new ApiException(HttpStatus.CONFLICT, "PERSON_HAS_ACCOUNT", "La persona ha conti associati");
         }
 
@@ -93,35 +82,4 @@ public class PersonService {
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "PERSON_NOT_FOUND", "Persona non trovata"));
     }
 
-    private boolean hasAccounts(Long id) {
-        var authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (!(authentication instanceof JwtAuthenticationToken jwt)
-                || !jwt.isAuthenticated()) {
-            throw new AuthenticationCredentialsNotFoundException(
-                    "Autenticazione JWT richiesta");
-        }
-
-        try {
-            PageResponse<AccountResponse> page = restClient.get()
-                    .uri(accountBaseUrl + "/api/account?personId={id}&size=1", id)
-                    .headers(headers -> headers.setBearerAuth(jwt.getToken().getTokenValue()))
-                    .retrieve()
-                    .body(new ParameterizedTypeReference<PageResponse<AccountResponse>>() {});
-
-            if (page != null && page.totalElements() != null) {
-                return page.totalElements() > 0;
-            }
-        }catch (RestClientException ex) {
-            throw upstreamUnavailable();
-        }
-
-        throw upstreamUnavailable();
-    }
-
-    private ApiException upstreamUnavailable() {
-        return new ApiException(
-                HttpStatus.SERVICE_UNAVAILABLE,
-                "UPSTREAM_UNAVAILABLE",
-                "Servizio remoto non disponibile");
-    }
 }
