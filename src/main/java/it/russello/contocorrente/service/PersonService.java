@@ -1,6 +1,6 @@
 package it.russello.contocorrente.service;
 
-import it.russello.contocorrente.client.InternalClient;
+import it.russello.contocorrente.client.AccountClient;
 import it.russello.contocorrente.dto.PersonRequest;
 import it.russello.contocorrente.dto.PersonResponse;
 import it.russello.contocorrente.entity.Person;
@@ -8,7 +8,6 @@ import it.russello.contocorrente.exception.ApiException;
 import it.russello.contocorrente.repository.PersonRepository;
 import it.russello.contocorrente.security.AccountSecurity;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -23,10 +22,8 @@ public class PersonService {
     private final PersonRepository personRepository;
     private final PasswordEncoder passwordEncoder;
     private final AccountSecurity accountSecurity;
-    private final InternalClient internalClient;
+    private final AccountClient accountClient;
 
-    @Value("${clients.account.base-url}")
-    private String accountBaseUrl;
 
     @PreAuthorize("isAnonymous() or hasRole('admin')")
     public PersonResponse create(PersonRequest request) {
@@ -72,7 +69,7 @@ public class PersonService {
     @PreAuthorize("hasRole('admin')")
     public void delete(Long id) {
         Person person = requirePerson(id);
-        if (internalClient.check(accountBaseUrl, "/internal/accounts/by-person/{id}/exists", id)) {
+        if(accountClient.hasAccounts(id)) {
             throw new ApiException(HttpStatus.CONFLICT, "PERSON_HAS_ACCOUNT", "La persona ha conti associati");
         }
 
@@ -84,4 +81,5 @@ public class PersonService {
         return personRepository.findById(id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "PERSON_NOT_FOUND", "Persona non trovata"));
     }
+
 }
