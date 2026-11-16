@@ -69,7 +69,7 @@ public class PersonService {
     @PreAuthorize("hasRole('admin')")
     public void delete(Long id) {
         Person person = requirePerson(id);
-        if(accountClient.hasAccounts(id)) {
+        if (accountClient.hasAccounts(id)) {
             throw new ApiException(HttpStatus.CONFLICT, "PERSON_HAS_ACCOUNT", "La persona ha conti associati");
         }
 

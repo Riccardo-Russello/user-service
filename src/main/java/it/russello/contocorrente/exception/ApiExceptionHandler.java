@@ -1,6 +1,7 @@
 package it.russello.contocorrente.exception;
 
-import it.russello.contocorrente.dto.*;
+import it.russello.contocorrente.dto.LoginRequest;
+import it.russello.contocorrente.dto.PersonRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;

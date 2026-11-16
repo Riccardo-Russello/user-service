@@ -19,7 +19,7 @@ public class ContocorrenteApplication {
     }
 
     @Bean
-    RestClient restCLient(RestClient.Builder builder){
+    RestClient restCLient(RestClient.Builder builder) {
         return builder.build();
     }
 

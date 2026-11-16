@@ -35,12 +35,13 @@ public class AccountClient {
                     .uri(accountBaseUrl + "/api/account?personId={id}&size=1", id)
                     .headers(headers -> headers.setBearerAuth(jwt.getToken().getTokenValue()))
                     .retrieve()
-                    .body(new ParameterizedTypeReference<PageResponse<AccountResponse>>() {});
+                    .body(new ParameterizedTypeReference<PageResponse<AccountResponse>>() {
+                    });
 
             if (page != null && page.totalElements() != null) {
                 return page.totalElements() > 0;
             }
-        }catch (RestClientException ex) {
+        } catch (RestClientException ex) {
             throw upstreamUnavailable();
         }
 

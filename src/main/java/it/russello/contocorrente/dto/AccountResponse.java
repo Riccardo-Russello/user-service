@@ -9,4 +9,5 @@ public record AccountResponse(
         String accountNumber,
         LocalDateTime openedAt,
         BigDecimal balance
-) {}
+) {
+}

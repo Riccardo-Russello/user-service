@@ -1,19 +1,14 @@
 package it.russello.contocorrente.service;
 
 import it.russello.contocorrente.client.AccountClient;
-import it.russello.contocorrente.security.AccountSecurity;
 import it.russello.contocorrente.dto.AccountResponse;
 import it.russello.contocorrente.dto.PageResponse;
 import it.russello.contocorrente.dto.PersonRequest;
 import it.russello.contocorrente.dto.PersonResponse;
 import it.russello.contocorrente.entity.Person;
 import it.russello.contocorrente.exception.ApiException;
-import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
-import org.springframework.web.client.RestClient;
 import it.russello.contocorrente.repository.PersonRepository;
+import it.russello.contocorrente.security.AccountSecurity;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,10 +16,15 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.data.domain.*;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.client.RestClient;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -37,6 +37,8 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 public class PersonServiceTest {
     private static final LocalDate BIRTH_DATE = LocalDate.of(1990, 5, 15);
+    private static final String ACCOUNT_URL = "http://account.test";
+    private static final String PERSON_ACCOUNTS = "/api/account?personId={id}&size=1";
     @Mock
     private PersonRepository personRepository;
     @Mock
@@ -45,30 +47,7 @@ public class PersonServiceTest {
     private PasswordEncoder passwordEncoder;
     @Mock
     private AccountSecurity accountSecurity;
-
-
     private PersonService personService;
-
-    private static final String ACCOUNT_URL = "http://account.test";
-    private static final String PERSON_ACCOUNTS = "/api/account?personId={id}&size=1";
-
-    @BeforeEach
-    void configureClientUrl() {
-        var accountClient = new AccountClient(restClient);
-        ReflectionTestUtils.setField(accountClient, "accountBaseUrl", ACCOUNT_URL);
-        personService = new PersonService(personRepository, passwordEncoder, accountSecurity, accountClient);
-        var jwt = Jwt.withTokenValue("test-token")
-                .header("alg", "HS256")
-                .subject("test")
-                .build();
-        SecurityContextHolder.getContext().setAuthentication(
-                new JwtAuthenticationToken(jwt, java.util.List.of()));
-    }
-
-    @AfterEach
-    void clearAuthentication() {
-        SecurityContextHolder.clearContext();
-    }
 
     private static Person person(Long id) {
         Person person = new Person("Mario", "Rossi", BIRTH_DATE);
@@ -87,6 +66,24 @@ public class PersonServiceTest {
     private static void assertApiError(ApiException exception, HttpStatus status, String code) {
         assertEquals(status, exception.getStatus());
         assertEquals(code, exception.getCode());
+    }
+
+    @BeforeEach
+    void configureClientUrl() {
+        var accountClient = new AccountClient(restClient);
+        ReflectionTestUtils.setField(accountClient, "accountBaseUrl", ACCOUNT_URL);
+        personService = new PersonService(personRepository, passwordEncoder, accountSecurity, accountClient);
+        var jwt = Jwt.withTokenValue("test-token")
+                .header("alg", "HS256")
+                .subject("test")
+                .build();
+        SecurityContextHolder.getContext().setAuthentication(
+                new JwtAuthenticationToken(jwt, java.util.List.of()));
+    }
+
+    @AfterEach
+    void clearAuthentication() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -224,7 +221,8 @@ public class PersonServiceTest {
         Person existing = person(1L);
         when(personRepository.findById(1L)).thenReturn(Optional.of(existing));
         when(stubGet(ACCOUNT_URL + PERSON_ACCOUNTS, 1L)
-                .body(new ParameterizedTypeReference<PageResponse<AccountResponse>>() {}))
+                .body(new ParameterizedTypeReference<PageResponse<AccountResponse>>() {
+                }))
                 .thenReturn(new PageResponse<>(List.of(), 0, 1, 0L, 0));
 
         personService.delete(1L);
@@ -241,7 +239,8 @@ public class PersonServiceTest {
         Person existing = person(1L);
         when(personRepository.findById(1L)).thenReturn(Optional.of(existing));
         when(stubGet(ACCOUNT_URL + PERSON_ACCOUNTS, 1L)
-                .body(new ParameterizedTypeReference<PageResponse<AccountResponse>>() {}))
+                .body(new ParameterizedTypeReference<PageResponse<AccountResponse>>() {
+                }))
                 .thenReturn(new PageResponse<>(List.of(), 0, 1, 1L, 1));
 
         ApiException exception = assertThrows(ApiException.class, () -> personService.delete(1L));
