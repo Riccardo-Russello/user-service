@@ -5,6 +5,8 @@ import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.web.client.RestClient;
 
 import java.time.LocalDate;
 
@@ -20,6 +22,8 @@ class PersonRepositoryTest {
     private PersonRepository personRepository;
     @Autowired
     private EntityManager entityManager;
+    @MockitoBean
+    private RestClient restClient;
 
     @Test
     void saveReadPersonFromDatabase() {

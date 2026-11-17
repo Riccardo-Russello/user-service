@@ -1,9 +1,7 @@
 package it.russello.contocorrente.controller;
 
-import it.russello.contocorrente.client.InternalClient;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import static org.mockito.Mockito.when;
-
+import it.russello.contocorrente.dto.AccountResponse;
+import it.russello.contocorrente.dto.PageResponse;
 import it.russello.contocorrente.entity.Person;
 import it.russello.contocorrente.repository.PersonRepository;
 import jakarta.persistence.EntityManager;
@@ -13,14 +11,20 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClient;
 
 import java.time.LocalDate;
+import java.util.List;
 
 import static it.russello.contocorrente.support.TestJwt.admin;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -37,7 +41,7 @@ public class PersonControllerIT {
     @Autowired
     private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
     @MockitoBean
-    private InternalClient internalClient;
+    private RestClient restClient;
 
     @Test
     void createPerson() throws Exception {
@@ -186,6 +190,11 @@ public class PersonControllerIT {
         entityManager.clear();
         long counterBefore = personRepository.count();
 
+        when(stubGet("http://account.test/api/account?personId={id}&size=1", id)
+                .body(new ParameterizedTypeReference<PageResponse<AccountResponse>>() {
+                }))
+                .thenReturn(new PageResponse<>(List.of(), 0, 1, 0L, 0));
+
         mockMvc.perform(delete("/api/person/{id}", id).with(admin(1L)))
                 .andExpect(status().isNoContent())
                 .andExpect(content().string(""));
@@ -227,13 +236,30 @@ public class PersonControllerIT {
         person.setUsername("delete.person");
         person.setPassword("fixture-password");
         personRepository.saveAndFlush(person);
-        when(internalClient.check("http://account.test",
-                "/internal/accounts/by-person/{id}/exists", person.getId())).thenReturn(true);
+        when(stubGet("http://account.test/api/account?personId={id}&size=1", person.getId())
+                .body(new ParameterizedTypeReference<PageResponse<AccountResponse>>() {
+                }))
+                .thenReturn(new PageResponse<>(List.of(), 0, 1, 1L, 1));
         mockMvc.perform(delete("/api/person/{id}", person.getId())
                         .with(admin(person.getId())))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("PERSON_HAS_ACCOUNT"));
         entityManager.clear();
         assertTrue(personRepository.existsById(person.getId()));
+    }
+
+    private RestClient.ResponseSpec stubGet(String url, Long id) {
+        RestClient.RequestHeadersUriSpec<?> uriSpec =
+                mock(RestClient.RequestHeadersUriSpec.class);
+        RestClient.RequestHeadersSpec<?> request =
+                mock(RestClient.RequestHeadersSpec.class);
+        RestClient.ResponseSpec response = mock(RestClient.ResponseSpec.class);
+
+        doReturn(uriSpec).when(restClient).get();
+        doReturn(request).when(uriSpec).uri(url, id);
+        doReturn(request).when(request).headers(any());
+        when(request.retrieve()).thenReturn(response);
+
+        return response;
     }
 }

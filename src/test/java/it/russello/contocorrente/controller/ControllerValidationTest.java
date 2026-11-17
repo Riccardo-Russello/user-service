@@ -17,6 +17,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.client.RestClient;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -40,6 +41,8 @@ public class ControllerValidationTest {
     PersonService personService;
     @MockitoBean
     AuthService authService;
+    @MockitoBean
+    private RestClient restClient;
 
     private static String quote(String value) {
         if (value == null) {

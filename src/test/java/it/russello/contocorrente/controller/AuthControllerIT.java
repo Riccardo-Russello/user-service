@@ -92,12 +92,6 @@ public class AuthControllerIT {
         String token = loginAndGetToken();
         mockMvc.perform(get("/api/person/my_profile").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isOk());
-
-        Long id = personRepository.findByUsername("mario.rossi").orElseThrow().getId();
-        mockMvc.perform(get("/internal/persons/{id}/exists", id)
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").value(true));
     }
 
     @Test
