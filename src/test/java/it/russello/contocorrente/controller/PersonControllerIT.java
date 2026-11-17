@@ -1,32 +1,34 @@
 package it.russello.contocorrente.controller;
 
-import it.russello.contocorrente.dto.AccountResponse;
-import it.russello.contocorrente.dto.PageResponse;
+import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import it.russello.contocorrente.entity.Person;
 import it.russello.contocorrente.repository.PersonRepository;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestClient;
 
 import java.time.LocalDate;
-import java.util.List;
 
 import static it.russello.contocorrente.support.TestJwt.admin;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+import org.springframework.test.context.DynamicPropertyRegistry;
+
+import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
+import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -40,8 +42,15 @@ public class PersonControllerIT {
     private EntityManager entityManager;
     @Autowired
     private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
-    @MockitoBean
-    private RestClient restClient;
+    @RegisterExtension
+    static final WireMockExtension accountMock = WireMockExtension.newInstance()
+            .options(wireMockConfig().dynamicPort().usingFilesUnderClasspath("wiremock"))
+            .build();
+
+    @DynamicPropertySource
+    static void accountProperties(DynamicPropertyRegistry registry) {
+        registry.add("clients.account.base-url", accountMock::baseUrl);
+    }
 
     @Test
     void createPerson() throws Exception {
@@ -190,14 +199,12 @@ public class PersonControllerIT {
         entityManager.clear();
         long counterBefore = personRepository.count();
 
-        when(stubGet("http://account.test/api/account?personId={id}&size=1", id)
-                .body(new ParameterizedTypeReference<PageResponse<AccountResponse>>() {
-                }))
-                .thenReturn(new PageResponse<>(List.of(), 0, 1, 0L, 0));
 
         mockMvc.perform(delete("/api/person/{id}", id).with(admin(1L)))
                 .andExpect(status().isNoContent())
                 .andExpect(content().string(""));
+
+        verifyAccountLookup(id);
         entityManager.flush();
         entityManager.clear();
 
@@ -236,30 +243,20 @@ public class PersonControllerIT {
         person.setUsername("delete.person");
         person.setPassword("fixture-password");
         personRepository.saveAndFlush(person);
-        when(stubGet("http://account.test/api/account?personId={id}&size=1", person.getId())
-                .body(new ParameterizedTypeReference<PageResponse<AccountResponse>>() {
-                }))
-                .thenReturn(new PageResponse<>(List.of(), 0, 1, 1L, 1));
+        accountMock.getRuntimeInfo().getWireMock()
+                .setSingleScenarioState("account-list", "Has account");
         mockMvc.perform(delete("/api/person/{id}", person.getId())
                         .with(admin(person.getId())))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("PERSON_HAS_ACCOUNT"));
+        verifyAccountLookup(person.getId());
         entityManager.clear();
         assertTrue(personRepository.existsById(person.getId()));
     }
 
-    private RestClient.ResponseSpec stubGet(String url, Long id) {
-        RestClient.RequestHeadersUriSpec<?> uriSpec =
-                mock(RestClient.RequestHeadersUriSpec.class);
-        RestClient.RequestHeadersSpec<?> request =
-                mock(RestClient.RequestHeadersSpec.class);
-        RestClient.ResponseSpec response = mock(RestClient.ResponseSpec.class);
-
-        doReturn(uriSpec).when(restClient).get();
-        doReturn(request).when(uriSpec).uri(url, id);
-        doReturn(request).when(request).headers(any());
-        when(request.retrieve()).thenReturn(response);
-
-        return response;
+    private void verifyAccountLookup(Long personId) {
+        accountMock.verify(1, getRequestedFor(urlPathEqualTo("/api/account"))
+                .withQueryParam("personId", equalTo(personId.toString()))
+                .withQueryParam("size", equalTo("1")));
     }
 }

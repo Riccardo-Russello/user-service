@@ -1,0 +1,42 @@
+{
+  "scenarioName": "account-list",
+  "requiredScenarioState": "Has account",
+  "request": {
+    "method": "GET",
+    "urlPath": "/api/account",
+    "queryParameters": {
+      "personId": {
+        "matches": "[0-9]+"
+      },
+      "size": {
+        "equalTo": "1"
+      }
+    },
+    "headers": {
+      "Authorization": {
+        "matches": "Bearer \\S+"
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "content": [
+        {
+          "id": 1,
+          "personId": 1,
+          "accountNumber": "TEST-001",
+          "openedAt": "2025-01-01T00:00:00",
+          "balance": 100.00
+        }
+      ],
+      "page": 0,
+      "size": 1,
+      "totalElements": 1,
+      "totalPages": 1
+    }
+  }
+}
