@@ -1,18 +1,18 @@
 package it.russello.contocorrente.controller;
 
-import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
+import com.github.tomakehurst.wiremock.WireMockServer;
 import it.russello.contocorrente.entity.Person;
 import it.russello.contocorrente.repository.PersonRepository;
 import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.InjectMocks;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,15 +23,22 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import org.springframework.test.context.DynamicPropertyRegistry;
-
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
-import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
+
+import org.wiremock.spring.ConfigureWireMock;
+import org.wiremock.spring.EnableWireMock;
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@EnableWireMock(
+        @ConfigureWireMock(
+                name = "account",
+                baseUrlProperties = "clients.account.base-url",
+                filesUnderClasspath = "wiremock"
+        )
+)
 @Transactional
 public class PersonControllerIT {
     @Autowired
@@ -42,14 +49,12 @@ public class PersonControllerIT {
     private EntityManager entityManager;
     @Autowired
     private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
-    @RegisterExtension
-    static final WireMockExtension accountMock = WireMockExtension.newInstance()
-            .options(wireMockConfig().dynamicPort().usingFilesUnderClasspath("wiremock"))
-            .build();
+    @InjectMocks
+    private WireMockServer accountMock;
 
-    @DynamicPropertySource
-    static void accountProperties(DynamicPropertyRegistry registry) {
-        registry.add("clients.account.base-url", accountMock::baseUrl);
+    @BeforeEach
+    void resetAccountMock() {
+        accountMock.resetToDefaultMappings();
     }
 
     @Test
@@ -243,8 +248,7 @@ public class PersonControllerIT {
         person.setUsername("delete.person");
         person.setPassword("fixture-password");
         personRepository.saveAndFlush(person);
-        accountMock.getRuntimeInfo().getWireMock()
-                .setSingleScenarioState("account-list", "Has account");
+        accountMock.setScenarioState("account-list", "Has account");
         mockMvc.perform(delete("/api/person/{id}", person.getId())
                         .with(admin(person.getId())))
                 .andExpect(status().isConflict())
