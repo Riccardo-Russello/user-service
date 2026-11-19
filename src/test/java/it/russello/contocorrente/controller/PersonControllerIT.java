@@ -8,7 +8,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.InjectMocks;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -29,6 +28,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 
 import org.wiremock.spring.ConfigureWireMock;
 import org.wiremock.spring.EnableWireMock;
+import org.wiremock.spring.InjectWireMock;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -49,7 +49,7 @@ public class PersonControllerIT {
     private EntityManager entityManager;
     @Autowired
     private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
-    @InjectMocks
+    @InjectWireMock("account")
     private WireMockServer accountMock;
 
     @BeforeEach
