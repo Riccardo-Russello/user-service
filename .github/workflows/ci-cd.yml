@@ -21,7 +21,7 @@ jobs:
 
       - name: Compila, esegui i test e verifica la coverage
         run: |
-          bash ./mvnw.cmd -B verify
+          bash ./mvnw -B verify
           test -s target/jacoc.exec || {
             echo "::error::JaCoCo non ha prodotto dati di coverage"
             exit 1
